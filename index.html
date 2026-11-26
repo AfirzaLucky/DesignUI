@@ -7,6 +7,16 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Anton&family=Archivo+Black&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script>
+  // Mode ringan untuk HP/tablet dan perangkat lemah: efek GPU berat (blur, backdrop-filter,
+  // drop-shadow, blend) dimatikan supaya animasi tetap 60 fps.
+  (function () {
+    var sentuh = window.matchMedia('(pointer: coarse)').matches;
+    var sempit = window.matchMedia('(max-width: 960px)').matches;
+    var lemah = (navigator.hardwareConcurrency || 8) <= 4 || (navigator.deviceMemory || 8) <= 4;
+    if (sentuh || sempit || lemah) document.documentElement.classList.add('ringan');
+  })();
+</script>
 <script type="module" src="https://cdn.jsdelivr.net/npm/@google/model-viewer@3.5.0/dist/model-viewer.min.js"></script>
 <style>
   /* =====================================================================
@@ -551,6 +561,29 @@
     .modal-kotak { border-radius: 22px; }
   }
 
+  /* =====================================================================
+     MODE RINGAN (HP / perangkat lemah)
+     ===================================================================== */
+  .ringan .bingkai { backdrop-filter: none; -webkit-backdrop-filter: none; background: linear-gradient(180deg, rgba(40,30,27,.92), rgba(18,13,11,.96)); }
+  .ringan .latar::after { display: none; }
+  .ringan .tirai { backdrop-filter: none; -webkit-backdrop-filter: none; background: rgba(0,0,0,.7); }
+  /* Masuk/ganti produk: geser + pudar saja, tanpa blur */
+  .ringan .masuk, .ringan .muncul { filter: none; }
+  .ringan .masuk-produk { filter: none; transform: scale(1.04); }
+  .ringan .siap .masuk, .ringan .muncul.terlihat { transition-property: opacity, transform; }
+  .ringan .siap .masuk-produk { transition-property: opacity, transform; }
+  .ringan .ganti .berganti { filter: none !important; }
+  .ringan .ganti .sepatu { filter: none; }
+  /* Bayangan sepatu: pakai elips .bayang saja, drop-shadow pada gambar besar terlalu berat */
+  .ringan .sepatu { filter: none; }
+  .ringan .sepatu-wadah, .ringan .bayang { will-change: transform; }
+  .ringan .kilau, .ringan .kartu .kilap { display: none; }
+  .ringan .pita { transform: rotate(-2deg) translateZ(0); }
+  .ringan .pita-isi { will-change: transform; }
+  .ringan .pratinjau .monogram { mix-blend-mode: normal; }
+  /* Animasi berulang berhenti saat tab tidak aktif */
+  .jeda *, .jeda *::before, .jeda *::after { animation-play-state: paused !important; }
+
   @media (prefers-reduced-motion: reduce) {
     *, *::before, *::after { animation: none !important; transition-duration: .01ms !important; transition-delay: 0s !important; scroll-behavior: auto !important; }
     .masuk, .masuk-produk, .muncul { filter: none; opacity: 1; transform: none; }
@@ -688,7 +721,7 @@
         camera-orbit="135deg 75deg auto" min-camera-orbit="auto 15deg auto" max-camera-orbit="auto 165deg auto"
         camera-controls disable-zoom disable-pan interaction-prompt="none" touch-action="pan-y"
         interpolation-decay="90" shadow-intensity="1.2" shadow-softness="0.9" exposure="1.05"
-        environment-image="neutral" field-of-view="28deg"></model-viewer>
+        environment-image="neutral" field-of-view="28deg" loading="eager" reveal="auto"></model-viewer>
       <div class="dial" aria-hidden="true">
         <svg viewBox="0 0 86 86"><circle class="jalur" cx="43" cy="43" r="38"/><circle class="busur" id="dialBusur" cx="43" cy="43" r="38" stroke-dasharray="238.8" stroke-dashoffset="238.8"/></svg>
         <div class="jarum" id="dialJarum"></div>
@@ -856,6 +889,10 @@ const dua = (n) => String(n).padStart(2, '0');
 const uang = (n) => '$' + n.toFixed(2);
 const gerakHalus = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 const pakaiMouse = window.matchMedia('(hover: hover) and (pointer: fine)').matches;
+const ringan = document.documentElement.classList.contains('ringan');
+const blur = (px) => (ringan ? 'blur(0px)' : `blur(${px}px)`);
+// Hentikan animasi CSS berulang saat tab tidak terlihat (hemat baterai & CPU).
+document.addEventListener('visibilitychange', () => document.documentElement.classList.toggle('jeda', document.hidden));
 
 const keadaan = {
   kategori: 'Running',
@@ -1198,7 +1235,7 @@ $('filterKoleksi').addEventListener('click', (e) => {
     kartu.forEach((k) => k.getAnimations().forEach((a) => a.cancel()));
     terapkanFilter();
     kartu.filter((k) => !k.classList.contains('tersaring')).forEach((k, i) => {
-      k.animate([{ opacity: 0, transform: 'translateY(24px) scale(.95)', filter: 'blur(8px)' }, { opacity: 1, transform: 'none', filter: 'blur(0)' }],
+      k.animate([{ opacity: 0, transform: 'translateY(24px) scale(.95)', filter: blur(8) }, { opacity: 1, transform: 'none', filter: blur(0) }],
         { duration: 500, delay: i * 70, easing: 'cubic-bezier(.2,.8,.2,1)', fill: 'backwards' });
     });
   }, 190);
@@ -1248,7 +1285,7 @@ document.querySelector('.form-kustom').addEventListener('click', (e) => {
   const w = e.target.closest('[data-kustom-warna]'), u = e.target.closest('[data-kustom-ukuran]');
   if (w) {
     keadaan.kustom.id = w.dataset.kustomWarna;
-    $('gambarKustom').animate([{ opacity: 0, filter: 'blur(10px)', transform: 'rotate(-14deg) translateX(30px)' }, { opacity: 1, filter: 'blur(0)', transform: 'rotate(-14deg)' }], { duration: 500, easing: 'cubic-bezier(.2,.8,.2,1)' });
+    $('gambarKustom').animate([{ opacity: 0, filter: blur(10), transform: 'rotate(-14deg) translateX(30px)' }, { opacity: 1, filter: blur(0), transform: 'rotate(-14deg)' }], { duration: 500, easing: 'cubic-bezier(.2,.8,.2,1)' });
     renderKustom();
   }
   if (u) { keadaan.kustom.ukuran = u.dataset.kustomUkuran; renderKustom(); }
@@ -1421,23 +1458,36 @@ if (pakaiMouse && gerakHalus) {
 // Partikel bara melayang (warna mengikuti aksen)
 if (gerakHalus) {
   const c = $('partikel'), g = c.getContext('2d');
-  let titik = [];
+  // Di HP: resolusi kanvas 1x, partikel lebih sedikit, tanpa shadowBlur (sangat berat).
+  const dpr = ringan ? 1 : Math.min(devicePixelRatio, 2);
+  let titik = [], lebarTerakhir = 0;
   const ukur = () => {
-    c.width = innerWidth * devicePixelRatio; c.height = innerHeight * devicePixelRatio;
-    const n = Math.round(Math.min(70, innerWidth / 18));
-    titik = Array.from({ length: n }, () => ({ x: Math.random() * c.width, y: Math.random() * c.height, r: (Math.random() * 1.8 + .4) * devicePixelRatio, v: Math.random() * .4 + .15, f: Math.random() * Math.PI * 2 }));
+    // Event resize di HP juga muncul saat bilah alamat muncul/hilang ketika scroll;
+    // bangun ulang hanya bila lebar berubah supaya scroll tidak tersendat.
+    if (innerWidth === lebarTerakhir) return;
+    lebarTerakhir = innerWidth;
+    c.width = innerWidth * dpr; c.height = Math.max(innerHeight, screen.height || 0) * dpr;
+    const n = Math.round(Math.min(ringan ? 22 : 70, innerWidth / 18));
+    titik = Array.from({ length: n }, () => ({ x: Math.random() * c.width, y: Math.random() * c.height, r: (Math.random() * 1.8 + .6) * dpr, v: Math.random() * .4 + .15, f: Math.random() * Math.PI * 2 }));
   };
   ukur(); addEventListener('resize', ukur);
+  // Warna aksen dibaca sekali per perubahan, bukan getComputedStyle tiap frame.
+  let warna = '#ff5a1f';
+  const bacaWarna = () => { warna = getComputedStyle(document.documentElement).getPropertyValue('--aksen').trim() || warna; };
+  bacaWarna();
+  new MutationObserver(bacaWarna).observe(document.documentElement, { attributes: true, attributeFilter: ['style'] });
   (function gambar() {
-    g.clearRect(0, 0, c.width, c.height);
-    const warna = getComputedStyle(document.documentElement).getPropertyValue('--aksen').trim() || '#ff5a1f';
-    titik.forEach((p) => {
-      p.y -= p.v * devicePixelRatio; p.f += .02; p.x += Math.sin(p.f) * .3 * devicePixelRatio;
-      if (p.y < -10) { p.y = c.height + 10; p.x = Math.random() * c.width; }
-      g.globalAlpha = .35 + Math.sin(p.f * 2) * .25;
-      g.fillStyle = warna; g.shadowColor = warna; g.shadowBlur = 8 * devicePixelRatio;
-      g.beginPath(); g.arc(p.x, p.y, p.r, 0, Math.PI * 2); g.fill();
-    });
+    if (!document.hidden) {
+      g.clearRect(0, 0, c.width, c.height);
+      g.fillStyle = warna;
+      if (!ringan) { g.shadowColor = warna; g.shadowBlur = 8 * dpr; }
+      titik.forEach((p) => {
+        p.y -= p.v * dpr; p.f += .02; p.x += Math.sin(p.f) * .3 * dpr;
+        if (p.y < -10) { p.y = c.height + 10; p.x = Math.random() * c.width; }
+        g.globalAlpha = .35 + Math.sin(p.f * 2) * .25;
+        g.beginPath(); g.arc(p.x, p.y, p.r, 0, Math.PI * 2); g.fill();
+      });
+    }
     requestAnimationFrame(gambar);
   })();
 }
@@ -1505,8 +1555,25 @@ if ('IntersectionObserver' in window) {
   let dimuat = false, otomatis = true, hover = false, tekan = false, kembaliTimer = null;
 
   // Model dimuat saat bagian studio mendekati layar (atau tombol 360° diklik), bukan saat halaman dibuka.
+  function gagal(alasan) {
+    panggung.classList.add('gagal');
+    panggung.querySelector('.studio-gagal').textContent = alasan;
+  }
+  function webglAda() {
+    try { const c = document.createElement('canvas'); return !!(c.getContext('webgl2') || c.getContext('webgl')); } catch (e) { return false; }
+  }
   function muatModel() {
     if (dimuat) return; dimuat = true;
+    if (!webglAda()) { gagal('Perangkat atau browser ini tidak mendukung WebGL, jadi tampilan 3D tidak bisa ditampilkan.'); return; }
+    // Bila model-viewer dari CDN tidak termuat (offline / diblokir), tampilkan pesan.
+    const batas = setTimeout(() => { if (!customElements.get('model-viewer')) gagal('Penampil 3D tidak termuat. Periksa koneksi internet lalu muat ulang halaman.'); }, 20000);
+    if (location.protocol !== 'file:') {
+      // Online (mis. Vercel): muat .glb langsung. Jauh lebih hemat memori daripada
+      // mengurai 10 MB base64, yang bisa gagal diam-diam di HP.
+      $('studioTeks').textContent = 'Mengunduh model 3D (7,8 MB)…';
+      customElements.whenDefined('model-viewer').then(() => { clearTimeout(batas); mv.src = 'assets/sepatu-3d.glb'; });
+      return;
+    }
     $('studioTeks').textContent = 'Mengunduh model 3D (10 MB)…';
     const sk = document.createElement('script');
     sk.src = 'assets/sepatu-3d.js';
@@ -1520,10 +1587,8 @@ if ('IntersectionObserver' in window) {
         $('studioTeks').textContent = 'Menyusun model…';
       });
     };
-    sk.onerror = () => panggung.classList.add('gagal');
+    sk.onerror = () => gagal('File model 3D tidak ditemukan.');
     document.body.appendChild(sk);
-    // Bila model-viewer dari CDN tidak termuat (offline), tampilkan pesan.
-    setTimeout(() => { if (!customElements.get('model-viewer')) panggung.classList.add('gagal'); }, 15000);
   }
   if ('IntersectionObserver' in window) {
     const io = new IntersectionObserver((e) => { if (e.some((x) => x.isIntersecting)) { muatModel(); io.disconnect(); } }, { rootMargin: '600px 0px' });
@@ -1531,6 +1596,8 @@ if ('IntersectionObserver' in window) {
   } else muatModel();
   document.querySelectorAll('[data-gulir="studio"]').forEach((b) => b.addEventListener('click', muatModel));
 
+  customElements.whenDefined('model-viewer').then((MV) => { if (ringan && MV.minimumRenderScale !== undefined) MV.minimumRenderScale = .5; });
+  if (ringan) mv.setAttribute('shadow-intensity', '0.8');
   mv.addEventListener('progress', (e) => { $('studioBar').style.width = (e.detail.totalProgress * 100) + '%'; });
   mv.addEventListener('load', () => {
     $('studioMemuat').classList.add('selesai');
@@ -1543,7 +1610,7 @@ if ('IntersectionObserver' in window) {
     // Masuk dengan putaran penuh sekali sebagai pembuka.
     if (gerakHalus) { mv.cameraOrbit = '-225deg 75deg auto'; requestAnimationFrame(() => { mv.cameraOrbit = '135deg 75deg auto'; }); }
   });
-  mv.addEventListener('error', () => panggung.classList.add('gagal'));
+  mv.addEventListener('error', (e) => gagal('Model 3D gagal dimuat' + (e.detail && e.detail.type ? ' (' + e.detail.type + ')' : '') + '. Coba muat ulang halaman.'));
 
   // Dial derajat mengikuti kamera
   mv.addEventListener('camera-change', () => {
@@ -1608,7 +1675,7 @@ if ('IntersectionObserver' in window) {
     mv.variantName = b.dataset.varian;
     $('namaVarian3d').textContent = judulVarian(b.dataset.varian);
     $('varian3d').querySelectorAll('.pil').forEach((x) => x.classList.toggle('aktif', x === b));
-    if (gerakHalus) mv.animate([{ filter: 'blur(10px)', opacity: .3 }, { filter: 'blur(0)', opacity: 1 }], { duration: 500, easing: 'cubic-bezier(.2,.8,.2,1)' });
+    if (gerakHalus) mv.animate([{ filter: blur(10), opacity: .3 }, { filter: blur(0), opacity: 1 }], { duration: 500, easing: 'cubic-bezier(.2,.8,.2,1)' });
   });
 })();
 
